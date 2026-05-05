@@ -1,0 +1,566 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<title>لوحة متابعة Odoo Enterprise 19 — الإدارة العليا</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    font-family: 'Tahoma','Segoe UI',Arial,sans-serif;
+    margin:0; padding:24px;
+    background: linear-gradient(135deg,#f0f4f8,#e8eef5);
+    color:#1a2b4a;
+  }
+  .header {
+    background: linear-gradient(90deg,#1F4E78,#2E75B6);
+    color:white; padding:20px 28px; border-radius:12px;
+    display:flex; justify-content:space-between; align-items:center;
+    box-shadow:0 4px 12px rgba(31,78,120,.2); margin-bottom:20px;
+  }
+  .header h1 { margin:0; font-size:22px; }
+  .header .meta { font-size:13px; opacity:.9; margin-top:4px; }
+  .header .badge {
+    background:rgba(255,255,255,.2); padding:6px 14px;
+    border-radius:20px; font-size:13px; font-weight:bold;
+  }
+  .kpis { display:grid; grid-template-columns:repeat(5,1fr); gap:14px; margin-bottom:20px; }
+  .kpi {
+    background:white; padding:18px; border-radius:10px;
+    box-shadow:0 2px 8px rgba(0,0,0,.06);
+    border-right:4px solid #2E75B6;
+  }
+  .kpi.green { border-right-color:#70AD47; }
+  .kpi.amber { border-right-color:#ED7D31; }
+  .kpi.red   { border-right-color:#C00000; }
+  .kpi .label { color:#666; font-size:13px; margin-bottom:6px; }
+  .kpi .value { font-size:28px; font-weight:bold; color:#1F4E78; }
+  .kpi .sub   { font-size:12px; color:#999; margin-top:4px; }
+  .grid { display:grid; grid-template-columns:2fr 1fr; gap:16px; margin-bottom:20px; }
+  .card {
+    background:white; padding:20px; border-radius:10px;
+    box-shadow:0 2px 8px rgba(0,0,0,.06);
+  }
+  .card h3 {
+    margin:0 0 16px 0; color:#1F4E78;
+    border-bottom:2px solid #e8eef5; padding-bottom:10px;
+    font-size:16px;
+  }
+  .phase-row {
+    display:grid; grid-template-columns:30px 1fr 90px 120px 60px;
+    gap:10px; align-items:center; padding:10px 0;
+    border-bottom:1px solid #f0f0f0; font-size:13px;
+  }
+  .phase-row:last-child { border-bottom:none; }
+  .progress-bar { background:#e8eef5; border-radius:10px; height:18px; position:relative; overflow:hidden; }
+  .progress-fill {
+    height:100%; border-radius:10px;
+    background:linear-gradient(90deg,#4472C4,#2E75B6);
+    display:flex; align-items:center; justify-content:flex-end;
+    padding-left:6px; color:white; font-size:11px; font-weight:bold;
+    min-width: 0;
+  }
+  .rag {
+    width:28px; height:28px; border-radius:50%;
+    display:inline-flex; align-items:center; justify-content:center;
+    font-size:14px; margin:0 auto; color:white; font-weight:bold;
+  }
+  .rag.g { background:#70AD47; }
+  .rag.a { background:#ED7D31; }
+  .rag.r { background:#C00000; }
+  .rag.w { background:#BFBFBF; }
+  .status { font-size:11px; padding:3px 10px; border-radius:12px; text-align:center; white-space:nowrap; }
+  .status.done { background:#d4edda; color:#155724; }
+  .status.prog { background:#cce5ff; color:#004085; }
+  .status.wait { background:#e2e3e5; color:#383d41; }
+  .status.late { background:#f8d7da; color:#721c24; }
+  table.summary { width:100%; border-collapse:collapse; font-size:13px; }
+  table.summary td { padding:8px 6px; border-bottom:1px solid #f0f0f0; }
+  table.summary td:first-child { color:#666; }
+  table.summary td:last-child { font-weight:bold; text-align:left; color:#1F4E78; }
+  .companies { display:grid; grid-template-columns:repeat(4,1fr); gap:10px; }
+  .company-card {
+    padding:12px; border-radius:8px; background:#f9fafc;
+    border-right:3px solid #BFBFBF; font-size:12px;
+  }
+  .company-card.green { border-right-color:#70AD47; background:#eff7e7; }
+  .company-card.amber { border-right-color:#ED7D31; background:#fff4e8; }
+  .company-card.red   { border-right-color:#C00000; background:#fcebec; }
+  .company-card .name  { font-weight:bold; color:#1F4E78; margin-bottom:4px; }
+  .company-card .stage { color:#666; font-size:11px; }
+  .company-card .pct   { font-size:18px; font-weight:bold; margin-top:6px; color:#1F4E78; }
+  .pay-row { display:grid; grid-template-columns:2fr 1fr 80px; padding:8px 0; border-bottom:1px solid #f0f0f0; font-size:12px; align-items:center; }
+  .pay-paid { color:#70AD47; font-weight:bold; }
+  .pay-due  { color:#888; }
+  .gantt-row { display:grid; grid-template-columns:200px 1fr; gap:10px; align-items:center; padding:6px 0; font-size:12px; }
+  .gantt-track { position:relative; height:22px; background:#f5f7fa; border-radius:4px; }
+  .gantt-bar { position:absolute; height:100%; border-radius:4px; display:flex; align-items:center; padding:0 6px; color:white; font-size:10px; font-weight:bold; }
+  .footer { text-align:center; color:#888; font-size:12px; margin-top:16px; padding:12px; }
+  #loading {
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    min-height:60vh; font-size:16px; color:#666;
+  }
+  #loading .spinner {
+    width:40px; height:40px; border:4px solid #e0e0e0;
+    border-top-color:#2E75B6; border-radius:50%;
+    animation:spin .8s linear infinite; margin-bottom:16px;
+  }
+  @keyframes spin { to { transform:rotate(360deg); } }
+  #error-msg {
+    display:none; background:#f8d7da; color:#721c24;
+    padding:16px; border-radius:8px; margin:24px auto;
+    max-width:600px; text-align:center; font-size:14px;
+  }
+  #dashboard { display:none; }
+</style>
+</head>
+<body>
+
+<div id="loading">
+  <div class="spinner"></div>
+  <div>جارٍ تحميل بيانات المشروع…</div>
+</div>
+
+<div id="error-msg"></div>
+
+<div id="dashboard">
+
+  <div class="header">
+    <div>
+      <h1>📊 لوحة متابعة مشروع تنفيذ Odoo Enterprise 19</h1>
+      <div class="meta" id="header-meta">جارٍ التحميل…</div>
+    </div>
+    <div class="badge" id="last-update">—</div>
+  </div>
+
+  <!-- KPIs -->
+  <div class="kpis">
+    <div class="kpi"><div class="label">نسبة الإنجاز الإجمالية</div><div class="value" id="kpi-pct">—</div><div class="sub">محسوبة بوزن مدة كل مرحلة</div></div>
+    <div class="kpi amber"><div class="label">المراحل قيد التنفيذ</div><div class="value" id="kpi-active">—</div><div class="sub" id="kpi-active-sub">—</div></div>
+    <div class="kpi red"><div class="label">BRD متأخرة</div><div class="value" id="kpi-brd">—</div><div class="sub">من أصل 8 شركات</div></div>
+    <div class="kpi green"><div class="label">المدفوع</div><div class="value" id="kpi-paid">—</div><div class="sub" id="kpi-paid-sub">—</div></div>
+    <div class="kpi red"><div class="label">المخاطر عالية الأولوية</div><div class="value" id="kpi-risks">—</div><div class="sub">تحتاج تدخّل فوري</div></div>
+  </div>
+
+  <!-- Main grid -->
+  <div class="grid">
+    <div class="card">
+      <h3>تقدم مراحل المشروع</h3>
+      <div class="phase-row" style="font-weight:bold;color:#666;font-size:11px">
+        <div>#</div><div>المرحلة</div><div style="text-align:center">الحالة</div><div style="text-align:center">التقدم</div><div style="text-align:center">RAG</div>
+      </div>
+      <div id="phases-rows"></div>
+    </div>
+
+    <div>
+      <div class="card" style="margin-bottom:16px">
+        <h3>توزيع حالة المراحل</h3>
+        <canvas id="donut" height="180"></canvas>
+      </div>
+      <div class="card">
+        <h3>الملخص المالي</h3>
+        <table class="summary" id="financial-table"></table>
+      </div>
+    </div>
+  </div>
+
+  <!-- BRD Companies -->
+  <div class="card" style="margin-bottom:20px">
+    <h3>متابعة BRD للشركات الثمانية التابعة</h3>
+    <div class="companies" id="companies-grid"></div>
+  </div>
+
+  <!-- Payments + Gantt -->
+  <div class="grid" style="grid-template-columns:1fr 1fr">
+    <div class="card">
+      <h3 id="payments-title">جدول الدفعات</h3>
+      <div class="pay-row" style="font-weight:bold;color:#666">
+        <div>الدفعة</div><div>المبلغ</div><div style="text-align:center">الحالة</div>
+      </div>
+      <div id="payments-rows"></div>
+    </div>
+
+    <div class="card">
+      <h3>الجدول الزمني</h3>
+      <div id="gantt-header" style="display:grid;gap:0;font-size:11px;color:#999;border-bottom:1px solid #eee;padding-bottom:6px;margin-bottom:8px"></div>
+      <div id="gantt-rows"></div>
+    </div>
+  </div>
+
+  <!-- Risks -->
+  <div class="card" style="margin-top:20px">
+    <h3>أبرز المخاطر النشطة</h3>
+    <table class="summary" style="font-size:13px">
+      <tr style="font-weight:bold;background:#f9fafc">
+        <td>المخاطرة</td><td style="text-align:center">التأثير</td><td style="text-align:center">الأولوية</td><td>المسؤول</td>
+      </tr>
+      <tbody id="risks-rows"></tbody>
+    </table>
+  </div>
+
+  <div class="footer" id="footer-text">مصدر البيانات: Google Sheets — يتم التحديث آلياً كل 5 دقائق · صلاحية قراءة فقط للإدارة العليا</div>
+
+</div><!-- end #dashboard -->
+
+<script>
+const API_URL = 'https://script.google.com/macros/s/AKfycbxje8uhJYqJIMyvLiUvfvA60Yjlbr-SE4npHig441SEoUKTJiqoU0X5lkqzL97WUUXOEQ/exec';
+const REFRESH_MS = 5 * 60 * 1000; // 5 minutes
+
+let donutChart = null;
+
+// ── helpers ──────────────────────────────────────────────────────────────────
+function fmt(n) { return Number(n).toLocaleString('ar-SA'); }
+function pct(n) { return (Number(n)*100).toFixed(1) + '%'; }
+
+function ragClass(emoji) {
+  if (emoji === '🟢') return 'g';
+  if (emoji === '🟡') return 'a';
+  if (emoji === '🔴') return 'r';
+  return 'w';
+}
+function ragSymbol(emoji) {
+  if (emoji === '🟢') return '✓';
+  if (emoji === '🟡') return '!';
+  if (emoji === '🔴') return '×';
+  return '·';
+}
+function statusClass(s) {
+  if (!s) return 'wait';
+  if (s.includes('مكتمل') || s.includes('Paid') || s.includes('paid')) return 'done';
+  if (s.includes('قيد')) return 'prog';
+  if (s.includes('متأخر')) return 'late';
+  return 'wait';
+}
+function companyColor(pctVal, status) {
+  const p = Number(pctVal);
+  if (p >= 1) return 'green';
+  if (p > 0 || (status && status.includes('المراجعة'))) return 'amber';
+  return 'red';
+}
+
+// ── parse sheets ─────────────────────────────────────────────────────────────
+function findRow(rows, key) {
+  for (const r of rows) {
+    for (let i = 0; i < r.length - 1; i++) {
+      if (String(r[i]).trim() === key) return String(r[i+1]).trim();
+    }
+  }
+  return '—';
+}
+
+function parseInfo(raw) {
+  return {
+    projectName: findRow(raw, 'اسم المشروع'),
+    client:      findRow(raw, 'العميل'),
+    executor:    findRow(raw, 'المنفذ'),
+    ref:         findRow(raw, 'رقم العرض'),
+    pm:          findRow(raw, 'مدير المشروع (المنفذ)'),
+    companies:   findRow(raw, 'عدد الشركات المشمولة'),
+    duration:    findRow(raw, 'إجمالي مدة المشروع'),
+    lastUpdate:  findRow(raw, 'آخر تحديث للوحة'),
+    total:       findRow(raw, 'إجمالي العقد شامل الضريبة'),
+    preVat:      findRow(raw, 'قيمة العقد قبل الضريبة (ر.س)'),
+    vat:         findRow(raw, 'ضريبة القيمة المضافة 15%'),
+  };
+}
+
+function parseSummary(raw) {
+  const out = {};
+  for (const r of raw) {
+    const key = String(r[1]||'').trim();
+    const val = r[2];
+    if (key) out[key] = val;
+  }
+  return out;
+}
+
+function parsePhases(raw) {
+  // row 0 = headers
+  const phases = [];
+  for (let i = 1; i < raw.length; i++) {
+    const r = raw[i];
+    if (!r[0] || isNaN(Number(r[0]))) continue;
+    phases.push({
+      num:    r[0],
+      name:   r[1],
+      owner:  r[2],
+      start:  r[3],
+      end:    r[4],
+      actual: r[5],
+      days:   r[6],
+      pct:    Number(r[7]||0),
+      status: r[8],
+      rag:    r[9],
+      value:  r[10],
+      paid:   r[11],
+      remain: r[12],
+      payPct: r[13],
+      notes:  r[14],
+    });
+  }
+  return phases;
+}
+
+function parseCompanies(raw) {
+  const companies = [];
+  for (let i = 3; i < raw.length; i++) {
+    const r = raw[i];
+    if (!r[0] || isNaN(Number(r[0]))) continue;
+    companies.push({
+      num:      r[0],
+      name:     r[1],
+      type:     r[2],
+      rep:      r[3],
+      received: r[4],
+      internalStatus: r[5],
+      sentToKayan: r[6],
+      kayanStatus: r[7],
+      approved: r[8],
+      pct:      r[9],
+      notes:    r[10],
+    });
+  }
+  return companies;
+}
+
+function parsePayments(raw) {
+  const payments = [];
+  for (let i = 3; i < raw.length; i++) {
+    const r = raw[i];
+    if (!r[0] || isNaN(Number(r[0]))) continue;
+    payments.push({
+      num:    r[0],
+      name:   r[1],
+      pct:    r[2],
+      cond:   r[3],
+      due:    r[4],
+      actual: r[5],
+      amount: r[6],
+      status: r[7],
+    });
+  }
+  return payments;
+}
+
+function parseRisks(raw) {
+  const risks = [];
+  for (let i = 3; i < raw.length; i++) {
+    const r = raw[i];
+    if (!r[0] || isNaN(Number(r[0]))) continue;
+    if (!String(r[1]||'').trim()) continue;
+    risks.push({
+      num:      r[0],
+      desc:     r[1],
+      impact:   r[2],
+      priority: r[3],
+      owner:    r[4],
+      plan:     r[5],
+      status:   r[6],
+    });
+  }
+  return risks;
+}
+
+// ── render ────────────────────────────────────────────────────────────────────
+function render(data) {
+  const info      = parseInfo(data.info);
+  const summary   = parseSummary(data.summary);
+  const phases    = parsePhases(data.phases);
+  const companies = parseCompanies(data.companies);
+  const payments  = parsePayments(data.payments);
+  const risks     = parseRisks(data.risks);
+
+  // Header
+  document.getElementById('header-meta').textContent =
+    `${info.client} · المنفذ: ${info.executor} · ${info.ref} · ${info.companies} شركات تابعة · ${info.duration}`;
+  document.getElementById('last-update').textContent =
+    'آخر تحديث: ' + (info.lastUpdate !== '—' ? new Date(info.lastUpdate).toLocaleDateString('ar-SA') : new Date().toLocaleDateString('ar-SA'));
+
+  // KPIs
+  const overallPct = summary['نسبة الإنجاز الإجمالية للمشروع'];
+  document.getElementById('kpi-pct').textContent = overallPct !== undefined ? pct(overallPct) : '—';
+
+  const activePhases = phases.filter(p => String(p.status).includes('قيد'));
+  document.getElementById('kpi-active').innerHTML =
+    `${activePhases.length}<span style="font-size:16px;color:#999"> / ${phases.length}</span>`;
+  document.getElementById('kpi-active-sub').textContent =
+    activePhases.length ? activePhases[0].name.split('-')[0].trim() + ' (' + pct(activePhases[0].pct) + ')' : 'لا توجد مراحل نشطة';
+
+  const brdLate = summary['BRD متأخرة'];
+  document.getElementById('kpi-brd').innerHTML =
+    `${Number(brdLate)||0}<span style="font-size:16px;color:#999"> / ${companies.length}</span>`;
+
+  const totalPaid = summary['المدفوع حتى الآن'];
+  const totalContract = summary['قيمة العقد قبل الضريبة'];
+  const payRatio = summary['نسبة السداد'];
+  document.getElementById('kpi-paid').textContent = totalPaid !== undefined ? fmt(totalPaid) : '—';
+  document.getElementById('kpi-paid-sub').textContent =
+    `من ${totalContract ? fmt(totalContract) : '—'} ر.س (${payRatio !== undefined ? pct(payRatio) : '—'})`;
+
+  const highRisks = summary['المخاطر عالية الأولوية'];
+  document.getElementById('kpi-risks').textContent = Number(highRisks)||0;
+
+  // Phases rows
+  const phasesEl = document.getElementById('phases-rows');
+  phasesEl.innerHTML = phases.map(p => {
+    const pctVal = Math.round(p.pct * 100);
+    const sc = statusClass(p.status);
+    const rc = ragClass(p.rag);
+    const rs = ragSymbol(p.rag);
+    return `<div class="phase-row">
+      <div>${p.num}</div>
+      <div title="${p.name}">${p.name}</div>
+      <div><span class="status ${sc}">${p.status||'—'}</span></div>
+      <div class="progress-bar"><div class="progress-fill" style="width:${pctVal}%">${pctVal > 10 ? pctVal+'%' : ''}</div></div>
+      <div style="text-align:center"><span class="rag ${rc}">${rs}</span></div>
+    </div>`;
+  }).join('');
+
+  // Donut chart
+  const counts = { done:0, prog:0, late:0, wait:0 };
+  phases.forEach(p => {
+    const sc = statusClass(p.status);
+    counts[sc] = (counts[sc]||0) + 1;
+  });
+  const donutData = [counts.prog, counts.late, counts.wait, counts.done];
+  const donutLabels = ['قيد التنفيذ','متأخرة','لم تبدأ','مكتملة'];
+  const donutColors = ['#4472C4','#C00000','#BFBFBF','#70AD47'];
+
+  if (donutChart) {
+    donutChart.data.datasets[0].data = donutData;
+    donutChart.update();
+  } else {
+    const ctx = document.getElementById('donut').getContext('2d');
+    donutChart = new Chart(ctx, {
+      type: 'doughnut',
+      data: {
+        labels: donutLabels,
+        datasets: [{ data: donutData, backgroundColor: donutColors, borderWidth: 0 }]
+      },
+      options: {
+        plugins: { legend: { position: 'bottom', labels: { font: { family: 'Tahoma' } } } },
+        cutout: '60%'
+      }
+    });
+  }
+
+  // Financial table
+  const fin = document.getElementById('financial-table');
+  const preVat = Number(info.preVat) || Number(totalContract) || 0;
+  const vatAmt = Math.round(preVat * 0.15);
+  const total  = preVat + vatAmt;
+  const paid   = Number(totalPaid) || 0;
+  const remain = Number(summary['المتبقي من الدفعات']) || (total - paid);
+  fin.innerHTML = `
+    <tr><td>قيمة العقد قبل الضريبة</td><td>${fmt(preVat)}</td></tr>
+    <tr><td>ضريبة 15%</td><td>${fmt(vatAmt)}</td></tr>
+    <tr><td>الإجمالي</td><td>${fmt(total)}</td></tr>
+    <tr><td>المدفوع</td><td style="color:#70AD47">${fmt(paid)}</td></tr>
+    <tr><td>المتبقي</td><td style="color:#C00000">${fmt(remain)}</td></tr>
+    <tr><td>نسبة السداد</td><td>${payRatio !== undefined ? pct(payRatio) : '—'}</td></tr>
+  `;
+
+  // Companies grid
+  const compEl = document.getElementById('companies-grid');
+  compEl.innerHTML = companies.map(c => {
+    const p = Number(c.pct) || 0;
+    const color = companyColor(p, c.internalStatus);
+    return `<div class="company-card ${color}">
+      <div class="name">${c.name}</div>
+      <div class="stage">${c.type||''} · ${c.internalStatus||'في الانتظار'}</div>
+      <div class="pct">${Math.round(p*100)}%</div>
+    </div>`;
+  }).join('');
+
+  // Payments
+  const totalContract2 = preVat + vatAmt;
+  document.getElementById('payments-title').textContent = `جدول الدفعات (${fmt(totalContract2)} ر.س)`;
+  const payEl = document.getElementById('payments-rows');
+  payEl.innerHTML = payments.map(p => {
+    const isPaid = String(p.status).toLowerCase().includes('paid');
+    return `<div class="pay-row">
+      <div>${p.name} (${p.pct})</div>
+      <div class="${isPaid ? 'pay-paid' : 'pay-due'}">${fmt(p.amount)} ر.س</div>
+      <div style="text-align:center"><span class="status ${isPaid ? 'done' : 'wait'}">${isPaid ? 'مدفوعة' : 'مستحقة'}</span></div>
+    </div>`;
+  }).join('');
+
+  // Gantt
+  const months = [...new Set(phases.map(p => {
+    const d = new Date(p.start);
+    return isNaN(d) ? null : d.toLocaleDateString('ar-SA', { month: 'long' });
+  }).filter(Boolean))].slice(0, 4);
+
+  const ganttHeader = document.getElementById('gantt-header');
+  ganttHeader.style.gridTemplateColumns = `200px repeat(${months.length||4},1fr)`;
+  ganttHeader.innerHTML = '<div></div>' + (months.length ? months : ['يناير','فبراير','مارس','أبريل'])
+    .map(m => `<div style="text-align:center">${m}</div>`).join('');
+
+  // Compute gantt positions relative to first start date
+  const startDates = phases.map(p => new Date(p.start)).filter(d => !isNaN(d));
+  const minDate = startDates.length ? Math.min(...startDates) : Date.now();
+  const allEndDates = phases.map(p => new Date(p.end)).filter(d => !isNaN(d));
+  const maxDate = allEndDates.length ? Math.max(...allEndDates) : minDate + 30*24*3600*1000;
+  const totalSpan = maxDate - minDate || 1;
+
+  const ragColors = { g:'#70AD47', a:'#ED7D31', r:'#C00000', w:'#BFBFBF' };
+
+  const ganttEl = document.getElementById('gantt-rows');
+  ganttEl.innerHTML = phases.map(p => {
+    const s = new Date(p.start), e = new Date(p.end);
+    let left = 0, width = 20;
+    if (!isNaN(s) && !isNaN(e)) {
+      left  = Math.max(0, Math.min(95, ((s - minDate) / totalSpan) * 100));
+      width = Math.max(4, Math.min(100 - left, ((e - s) / totalSpan) * 100));
+    }
+    const color = ragColors[ragClass(p.rag)] || '#BFBFBF';
+    const pctVal = Math.round(p.pct * 100);
+    // Short label for gantt
+    const shortName = p.name.length > 28 ? p.name.substring(0, 28) + '…' : p.name;
+    return `<div class="gantt-row">
+      <div title="${p.name}">${p.num}. ${shortName}</div>
+      <div class="gantt-track">
+        <div class="gantt-bar" style="background:${color};right:${left}%;width:${width}%">${pctVal ? pctVal+'%' : ''}</div>
+      </div>
+    </div>`;
+  }).join('');
+
+  // Risks
+  const risksEl = document.getElementById('risks-rows');
+  risksEl.innerHTML = risks.map(r => {
+    const impactClass = String(r.impact).includes('عال') ? 'late' : 'prog';
+    const prioClass   = String(r.priority).includes('عال') ? 'late' : 'prog';
+    return `<tr>
+      <td>${r.desc}</td>
+      <td style="text-align:center"><span class="status ${impactClass}">${r.impact}</span></td>
+      <td style="text-align:center"><span class="status ${prioClass}">${r.priority}</span></td>
+      <td>${r.owner||'—'}</td>
+    </tr>`;
+  }).join('');
+
+  // Show dashboard
+  document.getElementById('loading').style.display = 'none';
+  document.getElementById('dashboard').style.display = 'block';
+}
+
+// ── fetch & refresh ───────────────────────────────────────────────────────────
+async function loadData() {
+  try {
+    const res = await fetch(API_URL);
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const data = await res.json();
+    render(data);
+  } catch (err) {
+    document.getElementById('loading').style.display = 'none';
+    const errEl = document.getElementById('error-msg');
+    errEl.style.display = 'block';
+    errEl.textContent = 'تعذّر تحميل البيانات: ' + err.message + ' — يرجى التحقق من رابط Apps Script أو إعادة المحاولة.';
+  }
+}
+
+loadData();
+setInterval(loadData, REFRESH_MS);
+</script>
+
+</body>
+</html>
